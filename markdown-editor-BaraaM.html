@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Markdown Editor by Baraa M</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/4.3.0/marked.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/highlight.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/styles/github.min.css">
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+      margin: 0;
+      padding: 0;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      background-color: #f9f9f9;
+      color: #333;
+    }
+    .header {
+      background-color: #4a68ad;
+      color: white;
+      padding: 1rem;
+      text-align: center;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    .container {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+    .editor-pane, .preview-pane {
+      flex: 1;
+      padding: 1rem;
+      overflow-y: auto;
+      position: relative;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      margin: 1rem;
+      background-color: white;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    }
+    .editor-pane {
+      display: flex;
+      flex-direction: column;
+    }
+    #editor {
+      flex: 1;
+      resize: none;
+      border: none;
+      font-family: 'Courier New', monospace;
+      font-size: 16px;
+      padding: 1rem;
+      outline: none;
+      line-height: 1.5;
+      background-color: #f8f8f8;
+      border-radius: 4px;
+    }
+    .preview-pane {
+      position: relative;
+    }
+    .preview-header {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 1rem;
+    }
+    .preview-content {
+      padding: 1rem;
+      background-color: white;
+      border-radius: 4px;
+      line-height: 1.6;
+    }
+    .btn {
+      padding: 0.5rem 1rem;
+      background-color: #4a68ad;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: background-color 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-left: 0.5rem;
+    }
+    .btn:hover {
+      background-color: #3a548d;
+    }
+    .btn-group {
+      display: flex;
+    }
+    .btn svg {
+      margin-right: 0.25rem;
+    }
+    .notification {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 12px 20px;
+      background-color: #4CAF50;
+      color: white;
+      border-radius: 4px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      z-index: 1000;
+    }
+    .notification.show {
+      opacity: 1;
+    }
+    /* Markdown Preview Styles */
+    .preview-content h1, .preview-content h2 {
+      border-bottom: 1px solid #eaecef;
+      padding-bottom: 0.3em;
+    }
+    .preview-content pre {
+      background-color: #f6f8fa;
+      border-radius: 3px;
+      padding: 16px;
+      overflow: auto;
+    }
+    .preview-content code {
+      background-color: rgba(27,31,35,0.05);
+      border-radius: 3px;
+      padding: 0.2em 0.4em;
+      font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    }
+    .preview-content pre code {
+      background-color: transparent;
+      padding: 0;
+    }
+    .preview-content blockquote {
+      margin: 0;
+      padding: 0 1em;
+      color: #6a737d;
+      border-left: 0.25em solid #dfe2e5;
+    }
+    .preview-content img {
+      max-width: 100%;
+    }
+    .preview-content table {
+      border-collapse: collapse;
+      width: 100%;
+      margin-bottom: 16px;
+    }
+    .preview-content table th, .preview-content table td {
+      padding: 6px 13px;
+      border: 1px solid #dfe2e5;
+    }
+    .preview-content table tr:nth-child(2n) {
+      background-color: #f6f8fa;
+    }
+    .loading {
+      display: none;
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(255, 255, 255, 0.8);
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+    }
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #4a68ad;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Markdown Editor by Baraa M</h1>
+  </div>
+  <div class="container">
+    <div class="editor-pane">
+      <textarea id="editor" placeholder="Type your markdown here..." autofocus></textarea>
+    </div>
+    <div class="preview-pane">
+      <div class="preview-header">
+        <h2>Preview</h2>
+        <div class="btn-group">
+          <button id="copyBtn" class="btn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+            Copy
+          </button>
+          <button id="exportBtn" class="btn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            Export PDF
+          </button>
+        </div>
+      </div>
+      <div id="preview" class="preview-content"></div>
+      <div id="loading" class="loading">
+        <div class="spinner"></div>
+      </div>
+    </div>
+  </div>
+  <div id="notification" class="notification"></div>
+
+  <script>
+    // Initialize jsPDF
+    const { jsPDF } = window.jspdf;
+    
+    // DOM elements
+    const editor = document.getElementById('editor');
+    const preview = document.getElementById('preview');
+    const copyBtn = document.getElementById('copyBtn');
+    const exportBtn = document.getElementById('exportBtn');
+    const notification = document.getElementById('notification');
+    const loading = document.getElementById('loading');
+    
+    // Sample markdown content
+    const sampleMarkdown = `# Welcome to Markdown Editor
+
+## Features
+- **You can type markdown on the left and in real-time it shows rendered rich text on the right
+- **You can click “Export” on the right pane and it downloads a PDF of the rendered rich text
+- **You can click “Copy” on the right pane and it copies the rich text to my clipboard
+
+## Formatting Examples
+
+### Text Styling
+You can make text **bold**, *italic*, or ~~strikethrough~~.
+
+### Lists
+1. Ordered list item 1
+2. Ordered list item 2
+   - Unordered sublist item
+   - Another sublist item
+
+### Code
+\`\`\`javascript
+// Here's some code
+function greet(name) {
+  return \`Hello, \${name}!\`;
+}
+\`\`\`
+
+### Blockquotes
+> Everything changes once you
+> start using Jump.
+
+### Tables
+| Header 1 | Header 2 |
+|----------|----------|
+| Cell 1   | Cell 2   |
+| Cell 3   | Cell 4   |
+
+### Links
+[Visit GitHub](https://github.com/BaraahM)
+
+Start editing to see your changes reflected immediately!`;
+
+    // Set the sample markdown
+    editor.value = sampleMarkdown;
+    
+    // Configure marked.js
+    marked.setOptions({
+      highlight: function(code, lang) {
+        if (lang && hljs.getLanguage(lang)) {
+          try {
+            return hljs.highlight(code, { language: lang }).value;
+          } catch (err) {}
+        }
+        return hljs.highlightAuto(code).value;
+      },
+      breaks: true,
+      gfm: true
+    });
+    
+    // Function to update preview pane
+    function updatePreview() {
+      const markdown = editor.value;
+      const html = marked.parse(markdown);
+      preview.innerHTML = html;
+      
+      // Apply syntax highlighting to code blocks
+      document.querySelectorAll('pre code').forEach((block) => {
+        hljs.highlightElement(block);
+      });
+    }
+    
+    // Update preview on initial load
+    updatePreview();
+    
+    // Update preview in real-time as user types
+    editor.addEventListener('input', updatePreview);
+    
+    // Copy button functionality
+    copyBtn.addEventListener('click', async () => {
+      try {
+        const content = preview.innerHTML;
+        // Create a temporary element to hold the HTML content
+        const tempElement = document.createElement('div');
+        tempElement.innerHTML = content;
+        
+        // For modern browsers
+        if (navigator.clipboard && window.ClipboardItem) {
+          const blob = new Blob([tempElement.innerText], { type: 'text/plain' });
+          const clipboardItem = new ClipboardItem({ 'text/plain': blob });
+          await navigator.clipboard.write([clipboardItem]);
+          showNotification('Content copied to clipboard!');
+        } else {
+          // Fallback for older browsers
+          const tempInput = document.createElement('textarea');
+          tempInput.value = tempElement.innerText;
+          document.body.appendChild(tempInput);
+          tempInput.select();
+          document.execCommand('copy');
+          document.body.removeChild(tempInput);
+          showNotification('Content copied to clipboard!');
+        }
+      } catch (err) {
+        showNotification('Failed to copy content', true);
+        console.error('Failed to copy content: ', err);
+      }
+    });
+    
+    // Export to PDF functionality
+    exportBtn.addEventListener('click', async () => {
+      try {
+        loading.style.display = 'flex';
+        
+        // Wait a bit for the loading spinner to appear
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // Create a new jsPDF instance
+        const doc = new jsPDF({
+          orientation: 'p',
+          unit: 'mm',
+          format: 'a4',
+          putOnlyUsedFonts: true
+        });
+        
+        // Get the preview content
+        const content = document.getElementById('preview');
+        
+        // Use html2canvas to render the preview content to a canvas
+        const canvas = await html2canvas(content, {
+          scale: 2,
+          useCORS: true,
+          logging: false
+        });
+        
+        // Convert the canvas to an image
+        const imgData = canvas.toDataURL('image/png');
+        
+        // Calculate dimensions to fit within the PDF
+        const imgProps = doc.getImageProperties(imgData);
+        const pdfWidth = doc.internal.pageSize.getWidth();
+        const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+        
+        // Add the image to the PDF
+        doc.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+        
+        // If the content is longer than one page, add more pages
+        if (pdfHeight > doc.internal.pageSize.getHeight()) {
+          let heightLeft = pdfHeight;
+          let position = -doc.internal.pageSize.getHeight();
+          
+          while (heightLeft > 0) {
+            position = position - doc.internal.pageSize.getHeight();
+            heightLeft = heightLeft - doc.internal.pageSize.getHeight();
+            
+            if (heightLeft > 0) {
+              doc.addPage();
+              doc.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight);
+            }
+          }
+        }
+        
+        // Save the PDF
+        doc.save('markdown-export.pdf');
+        showNotification('PDF exported successfully!');
+      } catch (err) {
+        showNotification('Failed to export PDF', true);
+        console.error('Failed to export PDF: ', err);
+      } finally {
+        loading.style.display = 'none';
+      }
+    });
+    
+    // Show notification
+    function showNotification(message, isError = false) {
+      notification.textContent = message;
+      notification.style.backgroundColor = isError ? '#f44336' : '#4CAF50';
+      notification.classList.add('show');
+      
+      setTimeout(() => {
+        notification.classList.remove('show');
+      }, 3000);
+    }
+  </script>
+</body>
+</html>
